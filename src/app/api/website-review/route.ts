@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
       design: { score: designScore, details: designDetails },
       overall: 'See detailed advice for each category.'
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to analyze website.' }, { status: 500 });
   }
 } 

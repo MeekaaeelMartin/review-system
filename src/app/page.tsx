@@ -130,32 +130,29 @@ function createRipple(event: React.MouseEvent) {
   }, 600);
 }
 
-function DarkModeToggle() {
-  const [dark, setDark] = useState(false);
-  React.useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-  }, [dark]);
-  return (
-    <button
-      className="relative w-12 h-7 rounded-full bg-gradient-to-r from-blue-400 to-fuchsia-500 flex items-center transition-all duration-300 focus:outline-none shadow-inner focus:ring-2 focus:ring-fuchsia-400"
-      aria-label="Toggle dark mode"
-      onClick={() => setDark(d => !d)}
-    >
-      <span className={`absolute left-1 top-1 w-5 h-5 rounded-full bg-white dark:bg-zinc-900 shadow transition-transform duration-300 ${dark ? 'translate-x-5' : ''}`}></span>
-      <span className="absolute left-2 top-2 text-xs animate-fade-in">{dark ? '🌙' : '☀️'}</span>
-    </button>
-  );
+// Define types for the review result
+interface ReviewDetail {
+  criterion: string;
+  value?: string;
+  status?: string;
+  advice?: string;
+}
+interface ReviewResult {
+  speed: { score: number; details: ReviewDetail[] };
+  seo: { score: number; details: ReviewDetail[] };
+  design: { score: number; details: ReviewDetail[] };
+  overall: string;
 }
 
 function WebsiteReviewTab() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(60); // max wait time in seconds
+  const [countdown, setCountdown] = useState(60);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -174,8 +171,8 @@ function WebsiteReviewTab() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unknown error");
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to analyze website.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to analyze website.");
     } finally {
       setLoading(false);
       if (countdownRef.current) clearInterval(countdownRef.current);
