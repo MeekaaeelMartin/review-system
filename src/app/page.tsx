@@ -239,11 +239,50 @@ function WebsiteReviewTab() {
 function CompareToDesignTab() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [url, setUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<null | { numDiffPixels: number; diffImgBase64: string; advice: string; error?: string }>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files[0]) {
+      setUploading(true);
+      setFile(e.target.files[0]);
+      setTimeout(() => setUploading(false), 800); // Simulate quick upload feedback
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!file || !url) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('url', url);
+      formData.append('file', file);
+      const res = await fetch('/api/compare-design', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+      setResult(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to compare design.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="bg-white/80 dark:bg-zinc-900/80 rounded-2xl shadow-xl p-8 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 transition-all animate-slide-in">
       <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 bg-clip-text text-transparent animate-gradient-move animate-fade-in">Compare Website to Design</h2>
       <p className="mb-6 text-zinc-500 dark:text-zinc-400 animate-fade-in">Enter a website URL and upload your design PDF to compare and get improvement advice.</p>
-      <form className="flex flex-col gap-3 mb-8 animate-fade-in">
+      <form className="flex flex-col gap-3 mb-8 animate-fade-in" onSubmit={handleSubmit}>
         <div className="flex gap-2">
           <span className="inline-flex items-center px-3 rounded-l-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-lg">🔗</span>
           <input
@@ -251,6 +290,9 @@ function CompareToDesignTab() {
             placeholder="https://example.com"
             className="flex-1 px-4 py-2 rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 focus:outline-none glow-focus text-lg transition-all"
             required
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            disabled={loading || uploading}
           />
         </div>
         <div
@@ -258,7 +300,7 @@ function CompareToDesignTab() {
           onClick={() => fileInput.current?.click()}
           onDragOver={e => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={e => { e.preventDefault(); setDragActive(false); }}
-          onDrop={e => { e.preventDefault(); setDragActive(false); /* handle file */ }}
+          onDrop={e => { e.preventDefault(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files[0]) { setUploading(true); setFile(e.dataTransfer.files[0]); setTimeout(() => setUploading(false), 800); } }}
         >
           <input
             ref={fileInput}
@@ -266,18 +308,68 @@ function CompareToDesignTab() {
             accept="application/pdf"
             className="hidden"
             required
+            onChange={handleFileChange}
+            disabled={loading || uploading}
           />
-          <span className="text-4xl mb-2 animate-fade-in">📄</span>
+          {uploading ? (
+            <div className="flex flex-col items-center">
+              <span className="w-10 h-10 mb-2 border-4 border-blue-400 border-t-fuchsia-500 rounded-full animate-spin"></span>
+              <span className="text-zinc-400 text-sm">Uploading PDF…</span>
+            </div>
+          ) : file ? (
+            <span className="text-green-600 dark:text-green-400 font-medium mb-2">{file.name}</span>
+          ) : (
+            <span className="text-4xl mb-2 animate-fade-in">📄</span>
+          )}
           <span className="font-medium text-zinc-500 dark:text-zinc-400 animate-fade-in">Drag & drop PDF or <span className="underline text-blue-600 dark:text-fuchsia-400">click to upload</span></span>
         </div>
-        <button type="submit" className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 text-white font-bold shadow hover:scale-105 active:scale-95 transition-transform mt-2 focus:glow-focus ripple">Compare</button>
+        <button type="submit" className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 text-white font-bold shadow hover:scale-105 active:scale-95 transition-transform mt-2 focus:glow-focus ripple" disabled={loading || uploading || !file || !url}>
+          {loading ? 'Comparing…' : 'Compare'}
+        </button>
       </form>
-      {/* Results Placeholder */}
-      <div className="space-y-4 animate-fade-in">
-        <ResultCard title="🖼️ Visual Comparison" />
-        <ResultCard title="❗ Inconsistencies" />
-        <ResultCard title="💡 Advice to Match Design" />
-      </div>
+      {loading && (
+        <div className="flex flex-col items-center justify-center my-8 animate-fade-in">
+          <div className="w-16 h-16 mb-4 relative">
+            <span className="absolute inset-0 rounded-full border-4 border-blue-400 border-t-fuchsia-500 animate-spin" style={{ borderTopColor: '#a21caf' }}></span>
+            <span className="absolute inset-0 rounded-full border-4 border-blue-200 opacity-30"></span>
+          </div>
+          <div className="text-lg font-semibold text-blue-600 dark:text-fuchsia-400 animate-pulse">Comparing design and website…</div>
+          <div className="text-sm text-zinc-400 mt-1">(This may take up to 1 minute for detailed visual analysis)</div>
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 p-3 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-fade-in">{error}</div>
+      )}
+      {result && !loading && !error && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-5 rounded-xl bg-gradient-to-br from-white/90 to-blue-50/60 dark:from-zinc-900/90 dark:to-zinc-800/60 border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg transition-shadow animate-fade-in">
+            <span className="font-semibold text-lg bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-sm">🖼️ Visual Comparison</span>
+            <div className="mt-3 flex flex-col items-center">
+              <img
+                src={`data:image/png;base64,${result.diffImgBase64}`}
+                alt="Visual diff"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 shadow max-w-full max-h-96"
+              />
+              <div className="mt-2 text-zinc-500 dark:text-zinc-400 text-sm">Highlighted areas show differences between your design and the website.</div>
+            </div>
+          </div>
+          <div className="p-5 rounded-xl bg-gradient-to-br from-white/90 to-blue-50/60 dark:from-zinc-900/90 dark:to-zinc-800/60 border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg transition-shadow animate-fade-in">
+            <span className="font-semibold text-lg bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-sm">❗ Inconsistencies</span>
+            <div className="mt-2 text-zinc-700 dark:text-zinc-300 animate-fade-in">{result.numDiffPixels > 1000 ? 'Significant differences detected. Review the highlighted areas in the image above.' : 'No major inconsistencies detected.'}</div>
+          </div>
+          <div className="p-5 rounded-xl bg-gradient-to-br from-white/90 to-blue-50/60 dark:from-zinc-900/90 dark:to-zinc-800/60 border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg transition-shadow animate-fade-in">
+            <span className="font-semibold text-lg bg-gradient-to-r from-blue-500 via-purple-500 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-sm">💡 Advice to Match Design</span>
+            <div className="mt-2 text-zinc-700 dark:text-zinc-300 animate-fade-in">{result.advice}</div>
+          </div>
+        </div>
+      )}
+      {!result && !loading && !error && (
+        <div className="space-y-4 animate-fade-in">
+          <ResultCard title="🖼️ Visual Comparison" />
+          <ResultCard title="❗ Inconsistencies" />
+          <ResultCard title="💡 Advice to Match Design" />
+        </div>
+      )}
     </div>
   );
 }
