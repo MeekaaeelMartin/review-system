@@ -376,7 +376,7 @@ const DETAILED_EXPLANATIONS: Record<string, Record<string, { what: string; why: 
   }
 };
 
-function ResultCard({ title, score, advice, details, detailedType }: { title: string; score?: number; advice?: string; details?: any[]; detailedType?: 'speed' | 'seo' | 'design' }) {
+function ResultCard({ title, score, advice, details, detailedType }: { title: string; score?: number; advice?: string; details?: ReviewDetail[]; detailedType?: 'speed' | 'seo' | 'design' }) {
   const [open, setOpen] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
   return (
